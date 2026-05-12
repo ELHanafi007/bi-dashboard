@@ -5,7 +5,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const register = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, organizationName } = req.body;
 
   try {
     const userExists = await prisma.user.findUnique({ where: { email } });
@@ -16,8 +16,22 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // SaaS: Create Organization first
+    const organization = await prisma.organization.create({
+      data: {
+        name: organizationName || `${name}'s Company`,
+        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14-day trial
+      }
+    });
+
     const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword, role: role || 'MANAGER' }
+      data: { 
+        name, 
+        email, 
+        password: hashedPassword, 
+        role: role || 'MANAGER',
+        organizationId: organization.id
+      }
     });
 
     res.status(201).json({

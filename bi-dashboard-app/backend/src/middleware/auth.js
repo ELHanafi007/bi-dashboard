@@ -17,11 +17,27 @@ const protect = async (req, res, next) => {
 
       req.user = await prisma.user.findUnique({
         where: { id: decoded.id },
-        select: { id: true, email: true, name: true, role: true }
+        select: { 
+          id: true, 
+          email: true, 
+          name: true, 
+          role: true, 
+          organizationId: true,
+          organization: {
+            select: { status: true, plan: true, trialEndsAt: true }
+          }
+        }
       });
 
       if (!req.user) {
         return res.status(401).json({ message: 'User not found' });
+      }
+
+      if (req.user.organization.status !== 'ACTIVE') {
+        return res.status(403).json({ 
+          message: 'Your account is suspended or payment is required.',
+          status: req.user.organization.status 
+        });
       }
 
       next();

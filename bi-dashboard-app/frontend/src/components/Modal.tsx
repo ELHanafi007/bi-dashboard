@@ -65,7 +65,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
                   style={{
                     backgroundColor: 'transparent',
                     border: 'none',
-                    color: '#94a3b8',
+                    color: 'var(--text-muted)',
                     cursor: 'pointer',
                     padding: '0.25rem',
                     borderRadius: '6px',

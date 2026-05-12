@@ -6,12 +6,13 @@ const prisma = new PrismaClient();
 // @access  Private
 const getSalesAnalytics = async (req, res) => {
   try {
-    // Get sales grouped by date (last 30 days)
+    const orgId = req.user.organizationId;
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const sales = await prisma.order.findMany({
       where: {
+        organizationId: orgId,
         createdAt: {
           gte: thirtyDaysAgo
         }
@@ -42,14 +43,14 @@ const getSalesAnalytics = async (req, res) => {
   }
 };
 
-// @desc    Get category analytics
-// @route   GET /api/analytics/categories
-// @access  Private
 const getCategoryAnalytics = async (req, res) => {
   try {
+    const orgId = req.user.organizationId;
     const categories = await prisma.category.findMany({
+      where: { organizationId: orgId },
       include: {
         products: {
+          where: { organizationId: orgId },
           include: {
             _count: {
               select: { orderItems: true }

@@ -3,116 +3,74 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axiosInstance';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Package, 
-  Plus, 
-  Search, 
-  Edit2, 
-  Trash2, 
-  AlertTriangle,
-  CheckCircle2,
-  Tag,
-  DollarSign,
-  Layers,
-  Save
+  Package, Plus, Search, Edit2, Trash2, 
+  AlertTriangle, CheckCircle2, Save, Filter, ChevronRight
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { toast } from 'react-hot-toast';
+import { useLanguage } from '../context/LanguageContext';
 
 const Products: React.FC = () => {
   const queryClient = useQueryClient();
+  const { t, isRTL } = useLanguage();
+  const isMobile = window.innerWidth < 1024;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  
-  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    stock: '',
-    categoryId: ''
-  });
+  const [formData, setFormData] = useState({ name: '', description: '', price: '', stock: '', categoryId: '' });
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => {
-      const response = await api.get('/products');
-      return response.data;
-    }
+  const { data: products, isLoading } = useQuery({ 
+    queryKey: ['products'], 
+    queryFn: async () => { const r = await api.get('/products'); return r.data; } 
   });
-
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const response = await api.get('/products/categories');
-      return response.data;
-    }
+  const { data: categories } = useQuery({ 
+    queryKey: ['categories'], 
+    queryFn: async () => { const r = await api.get('/products/categories'); return r.data; } 
   });
 
   const upsertMutation = useMutation({
-    mutationFn: (data: any) => {
-      if (currentProduct) {
-        return api.put(`/products/${currentProduct.id}`, data);
-      }
-      return api.post('/products', data);
+    mutationFn: (data: any) => currentProduct ? api.put(`/products/${currentProduct.id}`, data) : api.post('/products', data),
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['products'] }); 
+      setIsModalOpen(false); 
+      toast.success(currentProduct ? t('product_updated') : t('product_created')); 
+      resetForm(); 
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      setIsModalOpen(false);
-      toast.success(currentProduct ? 'Product updated!' : 'Product created!');
-      resetForm();
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Something went wrong');
-    }
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Something went wrong')
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/products/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Product removed');
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['products'] }); 
+      toast.success(t('product_removed')); 
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete product');
-    }
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Failed')
   });
 
   const handleOpenModal = (product?: any) => {
-    if (product) {
-      setCurrentProduct(product);
-      setFormData({
-        name: product.name,
-        description: product.description || '',
-        price: product.price.toString(),
-        stock: product.stock.toString(),
-        categoryId: product.categoryId
-      });
-    } else {
-      setCurrentProduct(null);
-      resetForm();
+    if (product) { 
+      setCurrentProduct(product); 
+      setFormData({ name: product.name, description: product.description || '', price: product.price.toString(), stock: product.stock.toString(), categoryId: product.categoryId }); 
+    } else { 
+      setCurrentProduct(null); 
+      resetForm(); 
     }
     setIsModalOpen(true);
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      stock: '',
-      categoryId: categories?.[0]?.id || ''
-    });
-  };
+  const resetForm = () => setFormData({ 
+    name: '', description: '', price: '', stock: '', 
+    categoryId: categories?.[0]?.id || '' 
+  });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => 
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    upsertMutation.mutate(formData);
+  const handleSubmit = (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    upsertMutation.mutate(formData); 
   };
 
   const filteredProducts = products?.filter((p: any) => {
@@ -123,71 +81,39 @@ const Products: React.FC = () => {
 
   if (isLoading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        style={{ width: '40px', height: '40px', border: '4px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%' }}
+      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} 
+        style={{ width: '40px', height: '40px', border: '4px solid var(--border)', borderTopColor: '#6366f1', borderRadius: '50%' }} 
       />
     </div>
   );
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '3rem', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '1.5rem' : 0 }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.025em' }}>Inventory</h1>
-          <p style={{ color: '#64748b', marginTop: '0.25rem' }}>Manage your product stock and categories.</p>
+          <h1 style={{ fontSize: isMobile ? '1.75rem' : '2.5rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.04em' }}>{t('inventory_title')}</h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: isMobile ? '0.9rem' : '1.05rem' }}>{t('inventory_subtitle')}</p>
         </div>
-        <motion.button 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => handleOpenModal()}
-          className="btn btn-primary"
-          style={{ boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)', gap: '0.5rem', padding: '0.75rem 1.25rem' }}
-        >
-          <Plus size={18} />
-          Add New Product
-        </motion.button>
+        <button onClick={() => handleOpenModal()} className="btn-zenith btn-zenith-primary" style={{ padding: '0.85rem 1.5rem', width: isMobile ? '100%' : 'auto' }}>
+          <Plus size={20} /> {t('add_new_product')}
+        </button>
       </div>
 
-      {/* Filters & Search */}
-      <div className="card" style={{ marginBottom: '2rem', padding: '1.25rem', border: '1px solid #f1f5f9' }}>
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input 
-              type="text" 
-              placeholder="Search products..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 2.75rem',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#f8fafc',
-                outline: 'none',
-                fontSize: '0.9375rem',
-                transition: 'all 0.2s'
-              }}
-            />
+      {/* Filter Bar */}
+      <div className="zenith-card" style={{ marginBottom: '2.5rem', padding: '1.25rem' }}>
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, position: 'relative', minWidth: '300px' }}>
+            <Search size={18} style={{ position: 'absolute', [isRTL ? 'right' : 'left']: '1.25rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input type="text" placeholder={t('search_products')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="zenith-input" style={{ paddingLeft: isRTL ? '1.25rem' : '3.5rem', paddingRight: isRTL ? '3.5rem' : '1.25rem' }} />
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['All', ...(categories?.map((c: any) => c.name) || [])].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  padding: '0.625rem 1rem',
-                  borderRadius: '10px',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  backgroundColor: selectedCategory === cat ? '#0f172a' : 'white',
-                  color: selectedCategory === cat ? 'white' : '#64748b',
-                  border: '1px solid',
-                  borderColor: selectedCategory === cat ? '#0f172a' : '#e2e8f0',
-                  transition: 'all 0.2s'
-                }}
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <Filter size={16} style={{ color: 'var(--text-muted)', marginRight: '0.5rem' }} />
+            {[t('all'), ...(categories?.map((c: any) => c.name) || [])].map((cat, i) => (
+              <button key={cat} onClick={() => setSelectedCategory(i === 0 ? 'All' : cat)}
+                className={`btn-zenith ${ (i === 0 ? selectedCategory === 'All' : selectedCategory === cat) ? 'btn-zenith-primary' : 'btn-zenith-outline' }`}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem' }}
               >
                 {cat}
               </button>
@@ -196,68 +122,50 @@ const Products: React.FC = () => {
         </div>
       </div>
 
-      {/* Product Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+      {/* Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: isMobile ? '1.5rem' : '2rem' }}>
         <AnimatePresence>
-          {filteredProducts?.map((product: any) => (
-            <motion.div
-              layout
-              key={product.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              whileHover={{ y: -5 }}
-              className="card"
-              style={{ padding: '1.5rem', border: '1px solid #f1f5f9' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+          {filteredProducts?.map((product: any, idx: number) => (
+            <motion.div layout key={product.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ delay: idx * 0.05 }}
+              className="zenith-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ 
-                  backgroundColor: '#f8fafc', 
-                  color: '#3b82f6', 
-                  padding: '0.75rem', 
-                  borderRadius: '12px',
-                  border: '1px solid #f1f5f9'
+                  width: '80px', height: '80px', 
+                  borderRadius: '18px', overflow: 'hidden',
+                  border: '1px solid var(--glass-bg)',
+                  background: 'var(--glass-bg)'
                 }}>
-                  <Package size={24} />
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.05))', color: '#818cf8' }}>
+                      <Package size={32} />
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => handleOpenModal(product)} style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this product?')) {
-                      deleteMutation.mutate(product.id);
-                    }
-                  }} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    <Trash2 size={18} />
-                  </button>
+                  <button onClick={() => handleOpenModal(product)} className="btn-zenith btn-zenith-outline" style={{ padding: '0.6rem', borderRadius: '12px' }}><Edit2 size={16} /></button>
+                  <button onClick={() => { if (window.confirm(t('delete_product_confirm'))) deleteMutation.mutate(product.id); }} className="btn-zenith btn-zenith-outline" style={{ padding: '0.6rem', borderRadius: '12px', color: '#ef4444' }}><Trash2 size={16} /></button>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#3b82f6', backgroundColor: '#3b82f610', padding: '0.25rem 0.5rem', borderRadius: '6px' }}>
-                    {product.category.name}
-                  </span>
-                </div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>{product.name}</h3>
-                <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.5rem', lineHeight: '1.6' }}>
-                  {product.description || 'No description provided for this item.'}
-                </p>
+              <div>
+                <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.2)', fontSize: '0.65rem' }}>{product.category.name}</span>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)', marginTop: '0.75rem', letterSpacing: '-0.02em' }}>{product.name}</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.75rem', lineHeight: '1.6' }}>{product.description || t('no_description')}</p>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '12px' }}>
+              <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--glass-bg)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--glass-bg)' }}>
                 <div>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>PRICE</p>
-                  <p style={{ fontSize: '1.125rem', fontWeight: '800', color: '#0f172a' }}>${product.price}</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('price_label')}</p>
+                  <p className="mono" style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)', marginTop: '2px' }}>{product.price} MAD</p>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>STOCK</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                    {product.stock < 10 ? <AlertTriangle size={14} color="#f59e0b" /> : <CheckCircle2 size={14} color="#10b981" />}
-                    <p style={{ fontSize: '1.125rem', fontWeight: '800', color: product.stock < 10 ? '#f59e0b' : '#0f172a' }}>
-                      {product.stock}
-                    </p>
+                <div style={{ textAlign: isRTL ? 'left' : 'right' }}>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('stock_label')}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: isRTL ? 'flex-start' : 'flex-end', marginTop: '2px' }}>
+                    {product.stock < 10 ? <AlertTriangle size={16} color="#f59e0b" /> : <CheckCircle2 size={16} color="#10b981" />}
+                    <p className="mono" style={{ fontSize: '1.5rem', fontWeight: '800', color: product.stock < 10 ? '#f59e0b' : 'white' }}>{product.stock}</p>
                   </div>
                 </div>
               </div>
@@ -266,115 +174,36 @@ const Products: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* Upsert Modal */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title={currentProduct ? 'Edit Product' : 'Add New Product'}
-      >
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
-              Product Name
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Tag size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input 
-                type="text" 
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
-                placeholder="Ex: Wireless Mouse"
-              />
-            </div>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={currentProduct ? t('edit_product') : t('add_new_product')}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.65rem', fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-muted)' }}>{t('product_name')}</label>
+            <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="zenith-input" />
           </div>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
-              Category
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Layers size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <select 
-                name="categoryId"
-                value={formData.categoryId}
-                onChange={handleInputChange}
-                required
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none', appearance: 'none', backgroundColor: 'white' }}
-              >
-                <option value="" disabled>Select a category</option>
-                {categories?.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.65rem', fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-muted)' }}>{t('category')}</label>
+            <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className="zenith-input">
+              <option value="" disabled>{t('select_category')}</option>
+              {categories?.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </select>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
-                Price ($)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <DollarSign size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                <input 
-                  type="number" 
-                  step="0.01"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  required
-                  style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
-                  placeholder="0.00"
-                />
-              </div>
+              <label style={{ display: 'block', marginBottom: '0.65rem', fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-muted)' }}>{t('price')} (MAD)</label>
+              <input type="number" step="0.01" name="price" value={formData.price} onChange={handleInputChange} required className="zenith-input" placeholder="0.00" />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
-                Stock Count
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Package size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                <input 
-                  type="number" 
-                  name="stock"
-                  value={formData.stock}
-                  onChange={handleInputChange}
-                  required
-                  style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
-                  placeholder="0"
-                />
-              </div>
+              <label style={{ display: 'block', marginBottom: '0.65rem', fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-muted)' }}>{t('stock_count')}</label>
+              <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} required className="zenith-input" placeholder="0" />
             </div>
           </div>
-
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
-              Description
-            </label>
-            <textarea 
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              rows={3}
-              style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none', resize: 'none' }}
-              placeholder="Brief product description..."
-            />
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.65rem', fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-muted)' }}>{t('description')}</label>
+            <textarea name="description" value={formData.description} onChange={handleInputChange} rows={4} className="zenith-input" style={{ resize: 'none' }} placeholder={t('product_desc_placeholder')} />
           </div>
-
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', fontWeight: '700', gap: '0.5rem' }}
-            disabled={upsertMutation.isLoading}
-          >
-            <Save size={18} />
-            {upsertMutation.isLoading ? 'Processing...' : (currentProduct ? 'Update Product' : 'Create Product')}
-          </motion.button>
+          <button type="submit" className="btn-zenith btn-zenith-primary" style={{ width: '100%', padding: '1rem', marginTop: '1rem', justifyContent: 'center' }} disabled={upsertMutation.isPending}>
+            <Save size={20} /> {upsertMutation.isPending ? t('processing') : (currentProduct ? t('update_product') : t('create_product'))}
+          </button>
         </form>
       </Modal>
     </motion.div>

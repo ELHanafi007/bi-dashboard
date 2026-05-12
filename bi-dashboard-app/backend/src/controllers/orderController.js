@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 const getOrders = async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
+      where: { organizationId: req.user.organizationId },
       include: {
         customer: true,
         items: {
@@ -21,13 +22,13 @@ const getOrders = async (req, res) => {
   }
 };
 
-// @desc    Get order by ID
-// @route   GET /api/orders/:id
-// @access  Private
 const getOrderById = async (req, res) => {
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: req.params.id },
+    const order = await prisma.order.findFirst({
+      where: { 
+        id: req.params.id,
+        organizationId: req.user.organizationId
+      },
       include: {
         customer: true,
         items: {
@@ -46,41 +47,56 @@ const getOrderById = async (req, res) => {
   }
 };
 
-// @desc    Create new order
-// @route   POST /api/orders
-// @access  Private
 const createOrder = async (req, res) => {
-  const { customerId, items, total } = req.body;
+  const { customerId, items, total, paidAmount, paymentStatus } = req.body;
 
   if (!items || items.length === 0) {
     return res.status(400).json({ message: 'No order items' });
   }
 
+  const parsedTotal = parseFloat(total);
+  const parsedPaid = paidAmount !== undefined ? parseFloat(paidAmount) : parsedTotal;
+  const statusToSave = paymentStatus || (parsedPaid >= parsedTotal ? 'PAID' : (parsedPaid > 0 ? 'PARTIAL' : 'UNPAID'));
+  const debtIncrease = parsedTotal - parsedPaid;
+
   try {
     // Create order and order items in a transaction
     const order = await prisma.$transaction(async (tx) => {
+      // Verification: Ensure customer belongs to org
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, organizationId: req.user.organizationId }
+      });
+      if (!customer) throw new Error('Customer not found in your organization');
+
       // Create the order
       const newOrder = await tx.order.create({
         data: {
           customerId,
-          total: parseFloat(total),
+          total: parsedTotal,
+          paidAmount: parsedPaid,
+          paymentStatus: statusToSave,
+          organizationId: req.user.organizationId,
           items: {
             create: items.map((item) => ({
               productId: item.productId,
               quantity: parseInt(item.quantity),
-              price: parseFloat(item.price)
+              price: parseFloat(item.price),
+              organizationId: req.user.organizationId
             }))
           }
         },
         include: { items: true }
       });
 
-      // Update customer total spending
+      // Update customer total spending and debt
       await tx.customer.update({
         where: { id: customerId },
         data: {
           totalSpending: {
-            increment: parseFloat(total)
+            increment: parsedTotal
+          },
+          debt: {
+            increment: debtIncrease > 0 ? debtIncrease : 0
           }
         }
       });
@@ -106,13 +122,16 @@ const createOrder = async (req, res) => {
   }
 };
 
-// @desc    Update order status
-// @route   PUT /api/orders/:id/status
-// @access  Private
 const updateOrderStatus = async (req, res) => {
   const { status } = req.body;
 
   try {
+    const existing = await prisma.order.findFirst({
+      where: { id: req.params.id, organizationId: req.user.organizationId }
+    });
+
+    if (!existing) return res.status(404).json({ message: 'Order not found' });
+
     const order = await prisma.order.update({
       where: { id: req.params.id },
       data: { status }
