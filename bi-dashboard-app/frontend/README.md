@@ -71,3 +71,10 @@ export default defineConfig([
   },
 ])
 ```
+
+## Vercel Deployment
+
+This frontend is configured for deployment on Vercel. 
+- Ensure that the **Root Directory** in your Vercel Project Settings is set to `frontend`.
+- Client-side routing is handled automatically by the `vercel.json` rewrite configuration.
+
